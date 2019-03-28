@@ -1,0 +1,200 @@
+<ServerManagerConfiguration>
+<ProxyGroup name="sources">
+
+    <SourceProxy
+        name="MerrillTecplotReader"
+        class="vtkPythonProgrammableFilter"
+        label="Merrill Tecplot Reader">
+
+        <Documentation
+            short_help="A reader for Tecplot files produced by MERRILL"
+        >
+            Read typical MERRILL xxxx_mult.tec files that are written
+            by the "WriteMagnetization xxx" command.
+        </Documentation>
+
+        <StringVectorProperty
+            name="FileName"
+            animateable="0"
+            command="SetParameter"
+            initial_string="filename"
+            number_of_elements="1">
+            <FileListDomain name="files"/>
+            <Documentation>
+                The MERRILL Tecplot filename.
+            </Documentation>
+        </StringVectorProperty>
+
+        <!-- Set output type as vtkUnstructuredGrid -->
+        <IntVectorProperty
+            name="OutputDataSetType"
+            command="SetOutputDataSetType"
+            number_of_elements="1"
+            default_values="4"
+            panel_visibility="never"/>
+
+        <!-- Set the reader script -->
+        <StringVectorProperty
+            name="Script"
+            command="SetScript"
+            number_of_elements="1"
+            default_values="
+&#xa;
+&#xa;# Check filename exists, or else vtkTecplotReader will crash ParaView
+&#xa;import os.path
+&#xa;if not os.path.isfile(filename):
+&#xa;    return
+&#xa;
+&#xa;# Load filename
+&#xa;import vtk
+&#xa;reader = vtk.vtkTecplotReader()
+&#xa;reader.SetFileName(filename)
+&#xa;reader.Update()
+&#xa;
+&#xa;# Extract the data from the reader as a vtkUnstructuredGrid
+&#xa;reader_data = reader.GetOutput()
+&#xa;try:
+&#xa;    while True:
+&#xa;        reader_data = reader_data.GetBlock(0)
+&#xa;except: pass
+&#xa;
+&#xa;# Load the Mx,My,Mz arrays
+&#xa;reader_arrays = reader_data.GetPointData()
+&#xa;mx = reader_arrays.GetArray(&#x22;Mx&#x22;)
+&#xa;my = reader_arrays.GetArray(&#x22;My&#x22;)
+&#xa;mz = reader_arrays.GetArray(&#x22;Mz&#x22;)
+&#xa;
+&#xa;# Create the M array
+&#xa;m = vtk.vtkAbstractArray.CreateArray(mx.GetDataType())
+&#xa;m.SetName(&#x22;M&#x22;)
+&#xa;m.SetNumberOfComponents(3)
+&#xa;m.SetNumberOfTuples(mx.GetNumberOfTuples())
+&#xa;
+&#xa;# Copy Mx,My,Mz to M
+&#xa;for i in range(m.GetNumberOfTuples()):
+&#xa;    m.SetTuple3(i, mx.GetTuple1(i), my.GetTuple1(i), mz.GetTuple1(i))
+&#xa;
+&#xa;# Add M to reader_arrays, remove Mx, My, Mz
+&#xa;reader_arrays.AddArray(m)
+&#xa;reader_arrays.RemoveArray(&#x22;Mx&#x22;)
+&#xa;reader_arrays.RemoveArray(&#x22;My&#x22;)
+&#xa;reader_arrays.RemoveArray(&#x22;Mz&#x22;)
+&#xa;
+&#xa;# Copy reader_data to the output
+&#xa;self.GetOutput().ShallowCopy(reader_data)
+&#xa;"
+            panel_visibility="never">
+            <Hints>
+                <Widget type="multi_line"/>
+            </Hints>
+        </StringVectorProperty>
+
+        <!-- Set as Reader -->
+        <Hints>
+            <ReaderFactory
+                extensions="tec"
+                file_description="MERRILL Tecplot File"/>
+        </Hints>
+
+    </SourceProxy>
+
+</ProxyGroup>
+
+<ProxyGroup name="filters">
+    <SourceProxy
+        name="HelicityFilter"
+        class="vtkPythonProgrammableFilter"
+        label="Helicity">
+
+        <Documentation
+            short_help="Calculate the helicity of a vector field."
+        >
+            Calculate the helicity of a vector field.
+            This can be useful for highlighting interesting areas in
+            vortex and flower PSD states.
+        </Documentation>
+        <InputProperty
+            name="Input"
+            port_index="0"
+            command="SetInputConnection">
+            <ProxyGroupDomain name="groups">
+                <Group name="sources"/>
+                <Group name="filters"/>
+            </ProxyGroupDomain>
+            <DataTypeDomain name="input_type">
+                <DataType value="vtkDataSet"/>
+            </DataTypeDomain>
+            <InputArrayDomain
+                name="input_array"
+                attribute_type="point"
+                number_of_components="3"/>
+            <Documentation>
+                Set input for the filter
+            </Documentation>
+        </InputProperty>
+
+
+        <!-- Get the input vector name -->
+        <StringVectorProperty
+            name="InputArray"
+            command="SetParameter"
+            initial_string="InputArrayName"
+            number_of_elements="1"
+            >
+            <ArrayListDomain name="array_list">
+                <RequiredProperties>
+                  <Property name="Input" function="Input"/>
+                </RequiredProperties>
+            </ArrayListDomain>
+        </StringVectorProperty>
+
+        <!-- Set the output vector name -->
+        <StringVectorProperty
+            name="OutputArray"
+            command="SetParameter"
+            initial_string="OutputArrayName"
+            number_of_elements="1"
+            default_values="Helicity"/>
+
+        <!-- Set output same as input -->
+        <IntVectorProperty
+            command="SetOutputDataSetType"                          
+            default_values="8"                                      
+            name="OutputDataSetType"                                
+            number_of_elements="1"                                  
+            panel_visibility="never"/>
+
+        <!-- Set the helicity calculator script -->
+        <StringVectorProperty
+            name="Script"
+            command="SetScript"
+            number_of_elements="1"
+            default_values="
+&#xa;
+&#xa;# Setup helicity calculator
+&#xa;import vtk
+&#xa;helicity_calculator = vtk.vtkPythonCalculator()
+&#xa;helicity_calculator.SetInputConnection(self.GetInputConnection(0,0))
+&#xa;helicity_calculator.SetExpression(
+&#xa;   &#x22;dot(%s, curl(%s))&#x22;%(InputArrayName, InputArrayName)
+&#xa;)
+&#xa;helicity_calculator.SetArrayName(OutputArrayName)
+&#xa;helicity_calculator.CopyArraysOn()
+&#xa;helicity_calculator.Update()
+&#xa;
+&#xa;# Copy helicity calculator to output
+&#xa;self.GetOutput().ShallowCopy(helicity_calculator.GetOutput())
+&#xa;"
+            panel_visibility="never">
+            <Hints>
+                <Widget type="multi_line"/>
+            </Hints>
+        </StringVectorProperty>
+
+        <Hints>
+            <ShowInMenu category="MERRILL"/>
+        </Hints>
+
+    </SourceProxy>
+  </ProxyGroup>
+</ServerManagerConfiguration>

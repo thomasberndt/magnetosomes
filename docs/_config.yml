@@ -1,0 +1,45 @@
+theme: jekyll-theme-hacker
+defaults:
+  - scope:
+      path: "Equant_par"
+    values:
+      Equant_par: true
+  - scope:
+      path: "Equant_perp"
+    values:
+      Equant_perp: true
+  - scope:
+      path: "Equant_int"
+    values:
+      Equant_int: true
+  - scope:
+      path: "Elongated"
+    values:
+      Elongated: true
+  - scope:
+      path: "Bars"
+    values:
+      Bars: true
+  - scope:
+      path: "Bars remanent"
+    values:
+      Bars_remanent: true
+  - scope:
+      path: "Bars switching"
+    values:
+      Bars_switching: true
+  - scope:
+      path: "Remanent state"
+    values:
+      RemanentState: true
+  - scope:
+      path: "Switching mode"
+    values:
+      SwitchingMode: true
+  - scope:
+      path: "TEM"
+    values:
+      TEM: true
+collections:
+  mypages:
+    output: true
